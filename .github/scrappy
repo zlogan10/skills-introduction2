@@ -1,0 +1,84 @@
+# News Scraper
+
+## Overview
+This Python-based web scraper extracts news headlines and article snippets from various sources (BBC, CNN, Reuters). It uses Scrapy for web scraping and Newspaper3k for article parsing.
+
+## Installation
+Before running the scraper, ensure you have the required dependencies installed.
+
+```bash
+pip install scrapy newspaper3k
+```
+
+## Usage
+Run the scraper using the following command:
+
+```bash
+scrapy runspider news_scraper.py
+```
+
+## Code
+```python
+import scrapy
+from newspaper import Article
+from urllib.parse import urlparse
+import json
+
+# Ensure required libraries are installed
+try:
+    import scrapy
+    from newspaper import Article
+except ModuleNotFoundError as e:
+    print("Missing dependencies. Install them using:")
+    print("pip install scrapy newspaper3k")
+    raise e
+
+class NewsScraper(scrapy.Spider):
+    name = "news_scraper"
+    allowed_domains = ["bbc.com", "cnn.com", "reuters.com"]  # Add more sources
+    start_urls = [
+        "https://www.bbc.com/news",
+        "https://www.cnn.com/world",
+        "https://www.reuters.com/world",
+    ]
+
+    def parse(self, response):
+        for link in response.css("a::attr(href)").getall():
+            if "article" in link or link.startswith("/news"):  # Adjust filters for each site
+                full_url = response.urljoin(link)
+                yield scrapy.Request(full_url, callback=self.parse_article)
+
+    def parse_article(self, response):
+        try:
+            article = Article(response.url)
+            article.download()
+            article.parse()
+            
+            news_item = {
+                "title": article.title,
+                "url": response.url,
+                "source": urlparse(response.url).netloc,
+                "content": article.text[:500]  # Store only a snippet
+            }
+            
+            with open("scraped_news.json", "a") as f:
+                f.write(json.dumps(news_item) + "\n")
+        
+        except Exception as e:
+            self.logger.error(f"Error parsing article: {e}")
+```
+
+## Output
+The scraped data is saved in `scraped_news.json` in JSON format:
+
+```json
+{
+    "title": "Example Headline",
+    "url": "https://example.com/article",
+    "source": "example.com",
+    "content": "First 500 characters of the article..."
+}
+```
+
+## License
+This project is open-source and free to use. Modify as needed!
